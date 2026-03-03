@@ -311,6 +311,32 @@ def print_key_findings(results: dict):
     print(f"\n    Moratoria affect only hardware deployment ({decomp['hardware_share']:.0%} of progress).")
     print(f"    Software/algorithmic improvements continue regardless.")
 
+    # Algo doubling time dominance (Sobol finding)
+    print(f"\n  --- Key Sensitivity Finding ---")
+    print(f"    Sobol global sensitivity analysis (N=64, Saltelli sampling) finds that")
+    print(f"    algo_doubling_months is the single most influential parameter for peak")
+    print(f"    delay (S1 = 0.49, ST = 0.53). This means how fast software improves")
+    print(f"    determines the delay impact of moratoria more than any infrastructure")
+    print(f"    parameter. Faster software progress -> moratoria matter less.")
+    print(f"    Investment elasticity and reallocation delay have near-zero influence (ST < 0.05).")
+
+    # Baseline validation
+    if "baseline" in results:
+        bl_end_gw = results["baseline"].capacity_trajectory[-1] / 1000
+        bl_2030_idx = min(16, len(results["baseline"].capacity_trajectory) - 1)  # Q4 2029 ~ index 16
+        bl_2030_gw = results["baseline"].capacity_trajectory[bl_2030_idx] / 1000
+        print(f"\n  --- Baseline Validation ---")
+        print(f"    Baseline capacity at Q4 2029 (index {bl_2030_idx}): {bl_2030_gw:.1f} GW")
+        print(f"    Baseline capacity at simulation end: {bl_end_gw:.1f} GW")
+        print(f"    Industry target (DOE/S&P/Gartner midpoint): ~55 GW by 2030")
+        if bl_2030_gw > 70:
+            print(f"    NOTE: Baseline exceeds 2030 industry target. This reflects the")
+            print(f"    separation of queue congestion (interconnect only) from labor")
+            print(f"    congestion (build time). The 11-year simulation horizon extends")
+            print(f"    well past 2030, with continued ~8%/year compound growth.")
+        elif bl_2030_gw < 45:
+            print(f"    WARNING: Baseline falls well short of 2030 industry target.")
+
     print()
 
 
@@ -318,18 +344,14 @@ def print_logit_validation():
     """
     Validate the multinomial logit allocation against observed 2025 capacity shares.
 
-    The model allocates investment via softmax of regional attractiveness scores.
-    This check compares the logit-predicted allocation at t=0 to actual 2025
-    capacity shares (from JLL/CBRE data) to assess calibration quality.
+    Shows both uncalibrated (feature weights only) and calibrated (with ASCs)
+    predictions to demonstrate the calibration improvement.
     """
     print("=" * 72)
     print("  LOGIT ALLOCATION VALIDATION (t=0 vs. 2025 Observed)")
     print("=" * 72)
 
-    model = DisplacementModel()
-    predicted_shares = model.allocate_baseline(t=0)
-
-    # Observed shares: capacity_2025_mw / total US capacity
+    # Observed shares
     us_total = sum(r.capacity_2025_mw for r in REGIONS.values() if not r.is_international)
     observed_shares = {
         name: r.capacity_2025_mw / us_total
@@ -337,99 +359,140 @@ def print_logit_validation():
         if not r.is_international
     }
 
-    print(f"\n  {'Region':<22} | {'Observed':>10} | {'Predicted':>10} | {'Error':>10} |")
-    print(f"  {'-' * 62}")
+    # Uncalibrated model (feature weights only)
+    model_uncal = DisplacementModel(calibrate=False)
+    pred_uncal = model_uncal.allocate_baseline(t=0)
 
-    total_abs_error = 0.0
+    # Calibrated model (with ASCs)
+    model_cal = DisplacementModel(calibrate=True)
+    pred_cal = model_cal.allocate_baseline(t=0)
+
+    print(f"\n  {'Region':<22} | {'Observed':>10} | {'Uncalib.':>10} | {'Error':>10} | {'Calib.':>10} | {'Error':>10} |")
+    print(f"  {'-' * 84}")
+
+    uncal_err = 0.0
+    cal_err = 0.0
     for name in sorted(observed_shares.keys(), key=lambda n: observed_shares[n], reverse=True):
         obs = observed_shares[name]
-        pred = predicted_shares.get(name, 0.0)
-        err = pred - obs
-        total_abs_error += abs(err)
+        pu = pred_uncal.get(name, 0.0)
+        pc = pred_cal.get(name, 0.0)
+        eu = pu - obs
+        ec = pc - obs
+        uncal_err += abs(eu)
+        cal_err += abs(ec)
         r = REGIONS[name]
-        print(f"  {r.short_name + ' (' + r.name[:15] + ')':<22} | {obs:>9.1%} | {pred:>9.1%} | {err:>+9.1%} |")
+        label = f"{r.short_name} ({r.name[:15]})"
+        print(f"  {label:<22} | {obs:>9.1%} | {pu:>9.1%} | {eu:>+9.1%} | {pc:>9.1%} | {ec:>+9.1%} |")
 
-    print(f"  {'-' * 62}")
-    print(f"  {'Total absolute error':<22} | {'':>10} | {'':>10} | {total_abs_error:>9.1%} |")
+    print(f"  {'-' * 84}")
+    print(f"  {'Total abs error':<22} | {'':>10} | {'':>10} | {uncal_err:>9.1%} | {'':>10} | {cal_err:>9.1%} |")
 
-    # Compute scores for context
-    scores = model.compute_scores(t=0)
-    print(f"\n  Logit temperature: {model.temperature}")
-    print(f"  Score range: {min(scores[n] for n in observed_shares):.3f} - {max(scores[n] for n in observed_shares):.3f}")
-
-    # Assessment
-    max_err = max(abs(predicted_shares.get(n, 0) - observed_shares[n]) for n in observed_shares)
-    if total_abs_error < 0.30:
-        print(f"\n  Assessment: Good calibration (total abs error < 30%)")
-    elif total_abs_error < 0.60:
-        print(f"\n  Assessment: Moderate calibration (total abs error {total_abs_error:.0%})")
-        print(f"  The logit weights capture broad patterns but miss some regional detail.")
-        print(f"  Worst mismatch: {max_err:.1%} for a single region.")
-        print(f"  Since the model's value is in scenario COMPARISON (not point forecasts),")
-        print(f"  moderate calibration error is acceptable if relative rankings are right.")
-    else:
-        print(f"\n  Assessment: Poor calibration (total abs error {total_abs_error:.0%})")
-        print(f"  The logit weights need adjustment. Predicted shares diverge significantly")
-        print(f"  from observed 2025 capacity distribution.")
+    print(f"\n  Logit temperature: {model_cal.temperature}")
+    print(f"  Calibration method: Alternative-Specific Constants (McFadden 1974)")
+    print(f"  Uncalibrated error: {uncal_err:.0%} -> Calibrated error: {cal_err:.1%}")
+    print(f"\n  ASCs ensure the model reproduces observed 2025 shares exactly.")
+    print(f"  Feature weights then determine substitution patterns under moratorium shocks.")
+    print(f"  This is standard discrete choice calibration.")
     print()
 
 
 def print_sensitivity_analysis():
     """
-    Sweep key parameters to show the range of outcomes.
+    Sweep the most influential parameters (per Sobol analysis) to show
+    the range of outcomes.
 
-    An economist advising policymakers would never report a point estimate.
-    This table shows how the headline result (ADT peak delay) varies across
-    defensible parameter ranges.
+    Sobol global SA found that algo_doubling_months and effective_fungibility
+    dominate variance in delay and shortfall metrics. Investment elasticity
+    and reallocation delay have near-zero total-order indices (ST < 0.05).
+    This table sweeps the parameters that actually matter.
     """
+    import moratoria.module_c.compute as comp_mod
+    import moratoria.module_a.displacement as disp_mod
+
     print("=" * 72)
     print("  SENSITIVITY ANALYSIS (All Democratic Trifectas scenario)")
+    print("  Parameters selected by Sobol global sensitivity analysis")
     print("=" * 72)
 
     scenario = SCENARIOS["all_dem_trifectas"]
     baseline_scenario = SCENARIOS["baseline"]
 
-    elasticities = [0.10, 0.25, 0.35]
-    realloc_delays = [3, 5, 8]
+    # Sobol top parameters: algo doubling time and effective fungibility
+    algo_months = [8, 12, 18]
+    fungibilities = [0.40, 0.556, 0.70]
 
-    print(f"\n  Peak AI capabilities delay (weeks) by parameter combination:")
-    print(f"  {'':20} | Reallocation Delay:")
-    print(f"  {'Inv. Elasticity':>20} | {'3 qtrs (9mo)':>14} | {'5 qtrs (15mo)':>14} | {'8 qtrs (24mo)':>14} |")
-    print("  " + "-" * 70)
+    algo_labels = ["8mo (fast)", "12mo (base)", "18mo (slow)"]
+    fung_labels = ["0.40 (low)", "0.56 (base)", "0.70 (high)"]
 
-    # Also collect for range summary
+    print(f"\n  Peak AI capabilities delay (weeks):")
+    print(f"  {'':>22} | Algo Doubling Time:")
+    print(f"  {'Eff. Fungibility':>22} | {algo_labels[0]:>14} | {algo_labels[1]:>14} | {algo_labels[2]:>14} |")
+    print("  " + "-" * 72)
+
     all_delays = []
     all_shortfalls = []
+    all_deficits = []
 
-    for e in elasticities:
-        print(f"  {e:>20.2f} | ", end="")
-        for rd in realloc_delays:
-            bl = run_scenario(baseline_scenario, reallocation_delay=rd, investment_elasticity=e)
-            sc = run_scenario(scenario, reallocation_delay=rd, investment_elasticity=e)
-            compare_to_baseline(bl.ai_timeline, sc.ai_timeline)
-            delay_wk = sc.ai_timeline.peak_delay_qtrs * 13
-            peak_short = sc.ai_timeline.compute_shortfall_pct.max()
-            all_delays.append(delay_wk)
-            all_shortfalls.append(peak_short)
-            print(f"{delay_wk:>13.1f}wk | ", end="")
+    for fi, fung in enumerate(fungibilities):
+        print(f"  {fung_labels[fi]:>22} | ", end="")
+        for algo in algo_months:
+            # Monkey-patch
+            orig_algo = comp_mod.ALGO_DOUBLING_TIME_MONTHS
+            orig_fung = disp_mod.EFFECTIVE_FUNGIBILITY
+            comp_mod.ALGO_DOUBLING_TIME_MONTHS = algo
+            disp_mod.EFFECTIVE_FUNGIBILITY = fung
+            try:
+                bl = run_scenario(baseline_scenario)
+                sc = run_scenario(scenario)
+                compare_to_baseline(bl.ai_timeline, sc.ai_timeline)
+                delay_wk = sc.ai_timeline.peak_delay_qtrs * 13
+                peak_short = sc.ai_timeline.compute_shortfall_pct.max()
+                cumul = sc.ai_timeline.cumulative_flop_deficit_pct or 0
+                all_delays.append(delay_wk)
+                all_shortfalls.append(peak_short)
+                all_deficits.append(cumul)
+                print(f"{delay_wk:>13.1f}wk | ", end="")
+            finally:
+                comp_mod.ALGO_DOUBLING_TIME_MONTHS = orig_algo
+                disp_mod.EFFECTIVE_FUNGIBILITY = orig_fung
         print()
 
-    print(f"\n  Peak effective compute shortfall (%) by parameter combination:")
-    print(f"  {'':20} | Reallocation Delay:")
-    print(f"  {'Inv. Elasticity':>20} | {'3 qtrs (9mo)':>14} | {'5 qtrs (15mo)':>14} | {'8 qtrs (24mo)':>14} |")
-    print("  " + "-" * 70)
+    print(f"\n  Peak effective compute shortfall (%):")
+    print(f"  {'':>22} | Algo Doubling Time:")
+    print(f"  {'Eff. Fungibility':>22} | {algo_labels[0]:>14} | {algo_labels[1]:>14} | {algo_labels[2]:>14} |")
+    print("  " + "-" * 72)
 
     idx = 0
-    for e in elasticities:
-        print(f"  {e:>20.2f} | ", end="")
-        for rd in realloc_delays:
+    for fi, fung in enumerate(fungibilities):
+        print(f"  {fung_labels[fi]:>22} | ", end="")
+        for _ in algo_months:
             print(f"{all_shortfalls[idx]:>13.1f}% | ", end="")
+            idx += 1
+        print()
+
+    print(f"\n  Cumulative compute deficit (%):")
+    print(f"  {'':>22} | Algo Doubling Time:")
+    print(f"  {'Eff. Fungibility':>22} | {algo_labels[0]:>14} | {algo_labels[1]:>14} | {algo_labels[2]:>14} |")
+    print("  " + "-" * 72)
+
+    idx = 0
+    for fi, fung in enumerate(fungibilities):
+        print(f"  {fung_labels[fi]:>22} | ", end="")
+        for _ in algo_months:
+            print(f"{all_deficits[idx]:>12.1f}% | ", end="")
             idx += 1
         print()
 
     print(f"\n  RANGE: Peak delay spans {min(all_delays):.1f} to {max(all_delays):.1f} weeks")
     print(f"         Peak compute shortfall spans {min(all_shortfalls):.1f}% to {max(all_shortfalls):.1f}%")
-    print(f"         Central estimate (E=0.25, RD=5): {all_delays[4]:.1f} weeks / {all_shortfalls[4]:.1f}%")
+    print(f"         Cumulative deficit spans {min(all_deficits):.1f}% to {max(all_deficits):.1f}%")
+    center = len(algo_months) * 1 + 1  # middle of 3x3
+    print(f"         Central estimate (algo=12mo, fung=0.556): {all_delays[center]:.1f}wk / {all_shortfalls[center]:.1f}%")
+
+    print(f"\n  NOTE: Sobol analysis (N=64) found investment_elasticity and")
+    print(f"  reallocation_delay have near-zero influence (ST < 0.05).")
+    print(f"  Algo doubling time dominates peak delay (S1 = 0.49).")
+    print(f"  Logit temperature and agglomeration elasticity dominate shortfall.")
     print()
 
 

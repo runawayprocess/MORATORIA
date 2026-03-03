@@ -6,8 +6,9 @@ parameters drive the most variance in model outputs. Uses Saltelli
 sampling (SALib) across 8 key parameters, running the full A->B->C
 pipeline for each sample.
 
-Output: first-order indices (S1, direct effect) and total-order indices
-(ST, including interactions) for three metrics:
+Output: first-order indices (S1, direct effect), total-order indices
+(ST, including interactions), and optionally second-order indices (S2,
+pairwise interactions) for three metrics:
   - Peak delay (weeks)
   - Peak capacity shortfall (%)
   - Cumulative compute deficit (%)
@@ -19,7 +20,8 @@ References:
 """
 
 import numpy as np
-from dataclasses import dataclass
+from dataclasses import dataclass, field
+from typing import Optional
 
 # Parameter modules to monkey-patch
 import moratoria.module_a.displacement as disp_mod
@@ -80,6 +82,11 @@ class SobolResults:
     st_conf: dict[str, np.ndarray]
     n_samples: int
     metric_names: list[str]
+    # Second-order (optional)
+    s2: Optional[dict[str, np.ndarray]] = None
+    s2_conf: Optional[dict[str, np.ndarray]] = None
+    # Raw outputs for percentile computation
+    outputs: Optional[dict[str, np.ndarray]] = None
 
 
 # ---------------------------------------------------------------------------
@@ -153,17 +160,24 @@ def _patch_and_run(params: dict) -> dict:
 # Sobol analysis
 # ---------------------------------------------------------------------------
 
-def run_sobol(n_samples: int = 128, verbose: bool = True) -> SobolResults:
+def run_sobol(
+    n_samples: int = 128,
+    calc_second_order: bool = True,
+    verbose: bool = True,
+) -> SobolResults:
     """
     Run full Sobol global sensitivity analysis.
 
     Args:
-        n_samples: Base sample size. Total runs = n_samples * (2*D + 2)
-                   where D=8 parameters. Default 128 -> 2304 runs.
+        n_samples: Base sample size. Total runs depends on calc_second_order:
+                   with second_order: n_samples * (2*D + 2)
+                   without: n_samples * (D + 2)
+        calc_second_order: Compute pairwise interaction indices (S2).
         verbose: Print progress updates.
 
     Returns:
-        SobolResults with first-order and total-order indices.
+        SobolResults with first-order, total-order, and optionally
+        second-order indices plus raw outputs for percentile analysis.
     """
     from SALib.sample import saltelli
     from SALib.analyze import sobol
@@ -174,11 +188,16 @@ def run_sobol(n_samples: int = 128, verbose: bool = True) -> SobolResults:
         "bounds": PARAM_BOUNDS,
     }
 
-    if verbose:
-        total_runs = n_samples * (2 * len(PARAM_NAMES) + 2)
-        print(f"  Generating Saltelli samples: N={n_samples}, D={len(PARAM_NAMES)}, total runs={total_runs}")
+    if calc_second_order:
+        total_formula = n_samples * (2 * len(PARAM_NAMES) + 2)
+    else:
+        total_formula = n_samples * (len(PARAM_NAMES) + 2)
 
-    param_values = saltelli.sample(problem, n_samples, calc_second_order=False)
+    if verbose:
+        print(f"  Generating Saltelli samples: N={n_samples}, D={len(PARAM_NAMES)}, "
+              f"second_order={calc_second_order}, total runs={total_formula}")
+
+    param_values = saltelli.sample(problem, n_samples, calc_second_order=calc_second_order)
     total_runs = len(param_values)
 
     if verbose:
@@ -206,13 +225,18 @@ def run_sobol(n_samples: int = 128, verbose: bool = True) -> SobolResults:
     st_all = {}
     s1_conf_all = {}
     st_conf_all = {}
+    s2_all = {} if calc_second_order else None
+    s2_conf_all = {} if calc_second_order else None
 
     for m in metric_names:
-        si = sobol.analyze(problem, outputs[m], calc_second_order=False)
+        si = sobol.analyze(problem, outputs[m], calc_second_order=calc_second_order)
         s1_all[m] = si["S1"]
         st_all[m] = si["ST"]
         s1_conf_all[m] = si["S1_conf"]
         st_conf_all[m] = si["ST_conf"]
+        if calc_second_order:
+            s2_all[m] = si["S2"]
+            s2_conf_all[m] = si["S2_conf"]
 
     return SobolResults(
         param_names=PARAM_NAMES,
@@ -222,16 +246,21 @@ def run_sobol(n_samples: int = 128, verbose: bool = True) -> SobolResults:
         st_conf=st_conf_all,
         n_samples=n_samples,
         metric_names=metric_names,
+        s2=s2_all,
+        s2_conf=s2_conf_all,
+        outputs=outputs,
     )
 
 
 def print_sobol_results(results: SobolResults):
-    """Print formatted Sobol sensitivity indices."""
+    """Print formatted Sobol sensitivity indices with percentile ranges."""
     print("=" * 72)
     print("  SOBOL GLOBAL SENSITIVITY ANALYSIS")
     print("  (All Democratic Trifectas scenario)")
     print("=" * 72)
-    print(f"\n  Base samples: {results.n_samples}, Total model runs: {results.n_samples * (2 * len(results.param_names) + 2)}")
+
+    total_runs = results.n_samples * (2 * len(results.param_names) + 2)
+    print(f"\n  Base samples: {results.n_samples}, Total model runs: {total_runs}")
     print(f"  Parameters: {len(results.param_names)}")
 
     metric_labels = {
@@ -240,15 +269,14 @@ def print_sobol_results(results: SobolResults):
         "cumul_deficit_pct": "Cumulative Deficit (%)",
     }
 
+    # First/total order indices
     for metric in results.metric_names:
         label = metric_labels.get(metric, metric)
         print(f"\n  --- {label} ---")
         print(f"  {'Parameter':<22} | {'S1':>6} {'(conf)':>8} | {'ST':>6} {'(conf)':>8} |")
         print(f"  {'-' * 58}")
 
-        # Sort by ST descending
         order = np.argsort(-results.st[metric])
-
         for idx in order:
             name = PARAM_LABELS.get(results.param_names[idx], results.param_names[idx])
             s1 = results.s1[metric][idx]
@@ -257,8 +285,45 @@ def print_sobol_results(results: SobolResults):
             st_c = results.st_conf[metric][idx]
             print(f"  {name:<22} | {s1:>6.3f} ({s1_c:>6.3f}) | {st:>6.3f} ({st_c:>6.3f}) |")
 
+    # Second-order interactions (top 5 per metric)
+    if results.s2 is not None:
+        print(f"\n  --- Top Pairwise Interactions (S2) ---")
+        for metric in results.metric_names:
+            label = metric_labels.get(metric, metric)
+            s2 = results.s2[metric]
+            s2_conf = results.s2_conf[metric]
+            D = len(results.param_names)
+
+            # Collect all pairs
+            pairs = []
+            for i in range(D):
+                for j in range(i + 1, D):
+                    pairs.append((i, j, s2[i, j], s2_conf[i, j]))
+
+            # Sort by absolute S2 descending
+            pairs.sort(key=lambda x: abs(x[2]), reverse=True)
+
+            print(f"\n  {label}:")
+            for i, j, s2_val, s2_c in pairs[:5]:
+                n1 = PARAM_LABELS.get(results.param_names[i], results.param_names[i])
+                n2 = PARAM_LABELS.get(results.param_names[j], results.param_names[j])
+                sig = "*" if abs(s2_val) > s2_c else ""
+                print(f"    {n1} x {n2}: S2={s2_val:>7.3f} (conf {s2_c:.3f}){sig}")
+
+    # Percentile ranges from raw outputs
+    if results.outputs is not None:
+        print(f"\n  --- Output Distribution (from {len(results.outputs['peak_delay_wk'])} samples) ---")
+        for metric in results.metric_names:
+            label = metric_labels.get(metric, metric)
+            data = results.outputs[metric]
+            p10 = np.percentile(data, 10)
+            p50 = np.percentile(data, 50)
+            p90 = np.percentile(data, 90)
+            unit = "wk" if "delay" in metric else "%"
+            print(f"    {label}: p10={p10:.1f}{unit}, median={p50:.1f}{unit}, p90={p90:.1f}{unit}")
+
     print()
     print("  S1 = first-order (direct effect); ST = total-order (including interactions)")
+    print("  S2 = pairwise interaction (* = significant: |S2| > confidence interval)")
     print("  Parameters with ST > 0.1 are meaningfully influential.")
-    print("  Large ST-S1 gap indicates parameter interacts strongly with others.")
     print()

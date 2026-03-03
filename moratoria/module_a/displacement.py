@@ -5,6 +5,11 @@ Implements a multinomial logit (McFadden 1974) allocation of data center investm
 across market regions, with moratorium shocks, reallocation delays, workload
 fungibility filters, and Krugman (1991) agglomeration dynamics.
 
+Calibration: alternative-specific constants (ASCs) are computed analytically to
+match observed 2025 regional capacity shares. Feature weights then determine
+substitution patterns under moratorium shocks. This is standard McFadden logit
+calibration: ASCs reproduce the base case; feature weights drive counterfactuals.
+
 Sources:
 - McFadden (1974): discrete choice / logit allocation
 - Greenstone (2002): regulatory displacement of industrial activity
@@ -12,6 +17,7 @@ Sources:
 - Dechezlepretre et al. (2022): investment leakage from environmental regulation
 """
 
+import math
 import numpy as np
 from collections import defaultdict
 
@@ -20,6 +26,7 @@ from moratoria.config import (
     LOGIT_TEMPERATURE,
     REALLOCATION_DELAY_QTRS,
     EFFECTIVE_FUNGIBILITY,
+    FUNGIBILITY_PRICE_RESPONSE,
     AGGLOMERATION_BUILD_RATE,
     AGGLOMERATION_DECAY_RATE,
     AGGLOMERATION_ELASTICITY,
@@ -75,12 +82,16 @@ class DisplacementModel:
 
     Allocates national investment across regions using multinomial logit,
     applies moratorium shocks, and tracks reallocation with friction.
+
+    With calibrate=True (default), computes alternative-specific constants
+    (ASCs) so the logit reproduces observed 2025 regional capacity shares.
     """
 
     def __init__(
         self,
         regions: dict[str, RegionParams] = None,
         reallocation_delay: int = REALLOCATION_DELAY_QTRS,
+        calibrate: bool = True,
     ):
         self.regions = regions or REGIONS
         self.weights = LOGIT_WEIGHTS
@@ -93,8 +104,52 @@ class DisplacementModel:
             name: r.agglomeration_score_init for name, r in self.regions.items()
         }
 
+        # Alternative-specific constants (calibrated or zero)
+        self.intercepts: dict[str, float] = {}
+        if calibrate:
+            self._calibrate_intercepts()
+
         # Reallocation buffer: (destination_region, arrival_quarter) -> MW
         self.reallocation_buffer: dict[tuple[str, int], float] = defaultdict(float)
+
+    def _calibrate_intercepts(self):
+        """
+        Compute alternative-specific constants to match observed 2025 shares.
+
+        For a multinomial logit, the ASC that makes predicted share equal
+        observed share is: c_r = T * ln(obs_r) - f_r, where f_r is the
+        feature score. This is exact (no optimization needed).
+
+        International regions are excluded (they have no baseline allocation).
+        """
+        us_total = sum(
+            r.capacity_2025_mw for r in self.regions.values()
+            if not r.is_international
+        )
+        target_shares = {
+            name: r.capacity_2025_mw / us_total
+            for name, r in self.regions.items()
+            if not r.is_international
+        }
+
+        # Feature scores at t=0 without intercepts
+        saved = self.intercepts
+        self.intercepts = {}
+        scores = self.compute_scores(t=0)
+        self.intercepts = saved
+
+        # ASC formula
+        raw_intercepts = {}
+        for name in target_shares:
+            raw_intercepts[name] = (
+                self.temperature * math.log(target_shares[name]) - scores[name]
+            )
+
+        # Center around 0 for numerical stability
+        mean_val = sum(raw_intercepts.values()) / len(raw_intercepts)
+        self.intercepts = {
+            name: val - mean_val for name, val in raw_intercepts.items()
+        }
 
     def compute_scores(self, t: int) -> dict[str, float]:
         """Compute attractiveness score for each region."""
@@ -102,7 +157,7 @@ class DisplacementModel:
         w = self.weights
         for name, r in self.regions.items():
             agg = _agglomeration_contribution(self.agglomeration[name])
-            scores[name] = (
+            feature_score = (
                 w["grid"] * r.grid_speed_score
                 + w["fiber"] * r.fiber_density_score
                 + w["cost"] * r.cost_score
@@ -111,6 +166,7 @@ class DisplacementModel:
                 + w["water"] * r.water_score
                 + w["labor"] * r.labor_score
             )
+            scores[name] = feature_score + self.intercepts.get(name, 0.0)
         return scores
 
     def allocate_baseline(self, t: int) -> dict[str, float]:
@@ -143,6 +199,10 @@ class DisplacementModel:
         """
         Allocate investment with moratorium shocks.
 
+        Fungibility is endogenous: when moratoriums block a larger share of
+        national investment, scarcity raises DC prices, which increases the
+        effective relocation rate. This creates a stabilizing feedback loop.
+
         Returns dict with allocation, blocked, to_international.
         """
         baseline_shares = self.allocate_baseline(t)
@@ -159,9 +219,15 @@ class DisplacementModel:
 
         total_blocked = sum(blocked.values())
 
-        # Fungibility split: relocatable vs permanently lost
-        relocatable_mw = total_blocked * EFFECTIVE_FUNGIBILITY
-        non_relocatable_mw = total_blocked - relocatable_mw
+        # Endogenous fungibility: scarcity from moratoriums raises prices,
+        # increasing the fraction of blocked investment that relocates.
+        moratorium_coverage = total_blocked / max(total_investment_mw, 1)
+        adjusted_fungibility = min(
+            0.90,
+            EFFECTIVE_FUNGIBILITY + FUNGIBILITY_PRICE_RESPONSE * moratorium_coverage,
+        )
+
+        relocatable_mw = total_blocked * adjusted_fungibility
 
         # Redirect destinations (all non-blocked regions compete via logit)
         arrival_t = t + self.reallocation_delay

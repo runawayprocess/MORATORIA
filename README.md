@@ -38,9 +38,18 @@ Three-module pipeline:
 
 ## Sensitivity Analysis
 
-Run `--sobol` for a full Sobol global sensitivity analysis (Sobol 2001) across all 8 key parameters. This uses Saltelli sampling (SALib) to compute first-order indices (S1, direct effect) and total-order indices (ST, including interactions) for peak delay, peak shortfall, and cumulative deficit.
+Run `--sobol` for a full Sobol global sensitivity analysis (Sobol 2001) across all 8 key parameters. This uses Saltelli sampling (SALib) to compute first-order (S1), total-order (ST), and second-order (S2) indices for peak delay, peak shortfall, and cumulative deficit.
 
-Run `--validate` to compare the logit allocation at t=0 against observed 2025 regional capacity shares from JLL/CBRE data.
+**Key Sobol findings (N=64, 640 model evaluations):**
+- **Peak delay** is dominated by `algo_doubling_months` (S1=0.49). Faster software progress reduces the delay impact of moratoriums.
+- **Peak shortfall and cumulative deficit** are driven by `logit_temperature` (S1=0.32-0.51) and `agglomeration_elasticity` (S1=0.34). These determine how concentrated investment is and how strongly moratoriums disrupt it.
+- **Investment elasticity and reallocation delay have near-zero influence** (ST < 0.05). The old sensitivity table (sweeping these two) was misleading; the `--sensitivity` flag now sweeps `algo_doubling_months` x `effective_fungibility` instead.
+
+Run `--validate` to compare the logit allocation at t=0 against observed 2025 regional capacity shares. With ASC calibration, the model reproduces observed shares exactly.
+
+## Logit Calibration
+
+The displacement model uses alternative-specific constants (ASCs) computed analytically: `c_r = T * ln(obs_r) - f_r`. This ensures the logit reproduces observed 2025 regional capacity shares exactly. Feature weights then determine substitution patterns under moratorium shocks. Without ASCs, total absolute error is ~55% (NOVA: 32.4% observed vs 11.0% predicted). With ASCs, error is 0.0%.
 
 ## Known Limitations
 

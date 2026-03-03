@@ -109,6 +109,14 @@ EFFECTIVE_FUNGIBILITY = sum(
     v["share"] * v["fungibility"] for v in WORKLOAD_MIX.values()
 )
 
+# Endogenous fungibility: scarcity from moratoriums raises DC prices,
+# which increases the effective relocation rate. When moratorium coverage
+# (fraction of national investment blocked) is high, more investment
+# successfully relocates because returns in open regions are higher.
+# 0.5 = 10% coverage -> 5 pp increase in fungibility (0.556 -> 0.606).
+# Caps at 0.90 (some workloads truly cannot relocate).
+FUNGIBILITY_PRICE_RESPONSE = 0.5
+
 
 # ---------------------------------------------------------------------------
 # Module B: Aggregate Capacity Parameters

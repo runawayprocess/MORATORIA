@@ -16,7 +16,7 @@ import numpy as np
 from dataclasses import dataclass, field
 from typing import Optional
 
-from moratoria.config import T_END, INTL_ORGANIC_GROWTH_QTR, quarter_label
+from moratoria.config import T_END, INTL_ORGANIC_GROWTH_QTR, INVESTMENT_ELASTICITY, REALLOCATION_DELAY_QTRS, quarter_label
 from moratoria.data.regions import REGIONS
 from moratoria.data.scenarios import Scenario, SCENARIOS
 from moratoria.module_a.displacement import DisplacementModel
@@ -45,12 +45,13 @@ def run_scenario(
     scenario: Scenario,
     t_end: int = T_END,
     reallocation_delay: int = None,
-    ai_share_override: float = None,
+    investment_elasticity: float = None,
 ) -> SimulationResults:
     """Run a full simulation for one scenario."""
     displacement = DisplacementModel(
-        reallocation_delay=reallocation_delay or 3,
+        reallocation_delay=reallocation_delay or REALLOCATION_DELAY_QTRS,
     )
+    inv_elasticity = investment_elasticity if investment_elasticity is not None else INVESTMENT_ELASTICITY
     capacity_model = CapacityModel()
     investment_curve = compute_baseline_investment_curve(t_end=t_end)
 
@@ -71,8 +72,16 @@ def run_scenario(
     capacity_by_region = {r: np.zeros(t_end) for r in REGIONS}
 
     for t in range(t_end):
+        # Investment elasticity: policy uncertainty dampens total sector capex
+        baseline_shares = displacement.allocate_baseline(t)
+        moratorium_coverage = sum(
+            baseline_shares[r] * displacement.get_moratorium_strength(r, t, scenario)
+            for r in REGIONS if not REGIONS[r].is_international
+        )
+        dampened_investment = investment_curve[t] * (1 - inv_elasticity * moratorium_coverage)
+
         # Module A: Allocate investment
-        a_result = displacement.allocate_with_moratoria(t, scenario, investment_curve[t])
+        a_result = displacement.allocate_with_moratoria(t, scenario, dampened_investment)
         for region, mw in a_result["allocation"].items():
             capacity_model.add_to_pipeline(region, mw, t)
 

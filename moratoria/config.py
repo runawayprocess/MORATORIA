@@ -20,7 +20,7 @@ from dataclasses import dataclass
 # Time horizon
 # ---------------------------------------------------------------------------
 T_START = 0       # Q1 2026
-T_END = 28        # Q4 2032 (28 quarters)
+T_END = 44        # Q4 2036 (44 quarters)
 QUARTERS_PER_YEAR = 4
 BASE_YEAR = 2026
 BASE_QUARTER = 1  # Q1
@@ -76,8 +76,26 @@ AGGLOMERATION_BUILD_RATE = 0.06
 AGGLOMERATION_DECAY_RATE = 0.04
 AGGLOMERATION_ELASTICITY = 0.4
 
-# Reallocation friction
-REALLOCATION_DELAY_QTRS = 3
+# Reallocation friction: time for blocked investment to find new sites,
+# enter interconnection queues, and begin new permitting processes.
+# Includes: site identification (~2 qtrs), interconnection application (~1 qtr),
+# environmental/permitting review (~2 qtrs). Construction time is ADDITIONAL
+# and handled by the capacity pipeline model.
+# Sensitivity range: 3-8 quarters.
+REALLOCATION_DELAY_QTRS = 5
+
+# Investment elasticity: widespread moratoriums create policy uncertainty
+# that depresses total sector capex, not just redirects it.
+# Baker, Bloom, Davis (2016): 1 SD increase in Economic Policy Uncertainty
+# reduces investment 1-6% economy-wide; sector-specific effects 2-4x larger.
+# Julio & Yook (2012): political uncertainty reduces firm investment by 4.8%.
+# Gulen & Ion (2015): policy uncertainty delays corporate investment 8-13%.
+# Handley & Limao (2017): trade policy uncertainty reduces investment 8.3%.
+# For directly regulated sectors, Dechezlepretre et al. (2022) find 15-25%
+# investment reduction from EU ETS-level regulatory shocks.
+# 0.25 = midpoint of sector-specific range. At 50% moratorium coverage,
+# total national DC investment falls by 12.5%.
+INVESTMENT_ELASTICITY = 0.25
 
 # Workload fungibility: weighted-average fraction that can relocate (~0.556)
 WORKLOAD_MIX = {
@@ -141,5 +159,16 @@ HARDWARE_MILESTONES = {
 # Hardware efficiency growth (used in analytical decomposition only)
 HARDWARE_EFFICIENCY_GROWTH_ANNUAL = 0.30
 
-# Software parameters (analytical decomposition ONLY, not simulated)
+# Software parameters
 ALGO_DOUBLING_TIME_MONTHS = 12
+
+
+# Effective compute milestones (multiples of starting effective compute)
+# Spread across the full simulation horizon so milestone delays capture
+# the evolving shortfall at different points in time.
+# With ~27%/quarter growth, these are reached approximately:
+#   100x ~ Q2 2029, 1000x ~ Q1 2032, 10000x ~ Q4 2034, 100000x ~ Q3 2037
+EFFECTIVE_COMPUTE_MULTIPLIERS = {
+    "100x": 100, "1000x": 1000, "5000x": 5000, "10000x": 10_000,
+    "50000x": 50_000, "200000x": 200_000,
+}

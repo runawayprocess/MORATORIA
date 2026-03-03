@@ -81,10 +81,10 @@ SCENARIOS: dict[str, Scenario] = {
     "all_dem_trifectas": Scenario(
         name="All Democratic Trifectas",
         description=(
-            "Every Democratic trifecta state (excl. VA) passes a moratorium. "
-            "Covers NY, NJ, IL, CA, OR, WA, CO, ME, MD, CT, MA, RI. "
-            "VA excluded (unlikely despite Dem trifecta). "
-            "Assumes 2-year moratoria starting Q3 2026."
+            "Every Democratic trifecta state passes a moratorium, including VA. "
+            "Covers NY, NJ, VA, IL, CA, OR, WA, CO, ME, MD, CT, MA, RI. "
+            "VA included despite economic dependence on NoVA DC market. "
+            "Assumes 2-3 year moratoria starting Q3 2026."
         ),
         moratoria=[
             # NY + NJ: both Dem trifectas, strong momentum
@@ -102,9 +102,10 @@ SCENARIOS: dict[str, Scenario] = {
             # Effective strength ~0.55 reflecting trifecta share of bucket capacity.
             MoratoriumSpec("OTHER_BLUE", start_t=3, end_t=11, strength=0.55), # Q4 2026 -> Q2 2028
 
-            # NOVA: VA excluded per user instruction.
-            # MD (~15% of NOVA metro capacity) is a Dem trifecta with HB0120.
-            MoratoriumSpec("NOVA", start_t=4, end_t=12, strength=0.15),      # Q1 2027 -> Q1 2028 (MD only)
+            # NOVA: VA is a Dem trifecta (85% of NOVA capacity) + MD HB0120 (15%).
+            # VA moratorium would block new permits but honor existing ones.
+            # Strength 0.85 = VA full block (85%) + MD partial (15% * ~50%).
+            MoratoriumSpec("NOVA", start_t=2, end_t=10, strength=0.85),      # Q3 2026 -> Q2 2028
         ],
     ),
 }

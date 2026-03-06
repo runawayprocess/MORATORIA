@@ -1,11 +1,11 @@
 """
 Moratorium scenario definitions.
 
-Two main scenarios:
+Four scenario families:
 1. "Currently Considering": States with active, plausible moratorium proposals.
-2. "All Democratic Trifectas": Every Democratic trifecta state (excl. Virginia) passes
-   a moratorium. Virginia has a Dem trifecta but is unlikely to pass a moratorium
-   given its economic dependence on the NoVA data center market.
+2. "All Democratic Trifectas": Every Dem trifecta state passes a 2-3yr moratorium.
+3. "ADT 5-Year": Same states, 5-year moratorium durations (prolonged scenario).
+4. "ADT 10-Year": Same states, 10-year durations (semi-permanent policy).
 
 Democratic trifecta states (as of early 2026, 16 total):
   CA, CO, CT, DE, HI, IL, ME, MD, MA, NJ, NM, NY, OR, RI, VA, WA
@@ -106,6 +106,38 @@ SCENARIOS: dict[str, Scenario] = {
             # VA moratorium would block new permits but honor existing ones.
             # Strength 0.85 = VA full block (85%) + MD partial (15% * ~50%).
             MoratoriumSpec("NOVA", start_t=2, end_t=10, strength=0.85),      # Q3 2026 -> Q2 2028
+        ],
+    ),
+
+    "adt_5yr": Scenario(
+        name="ADT 5-Year",
+        description=(
+            "All Democratic Trifectas with 5-year moratorium durations. "
+            "Tests what happens when moratoriums are prolonged rather than transient. "
+            "Same states and strengths as ADT; all moratoria run ~Q3 2026 -> Q3 2031."
+        ),
+        moratoria=[
+            MoratoriumSpec("NYC_NJ", start_t=2, end_t=22, strength=1.0),      # Q3 2026 -> Q3 2031
+            MoratoriumSpec("CHI", start_t=3, end_t=23, strength=1.0),          # Q4 2026 -> Q4 2031
+            MoratoriumSpec("WEST_COAST", start_t=3, end_t=23, strength=0.85),  # Q4 2026 -> Q4 2031
+            MoratoriumSpec("OTHER_BLUE", start_t=3, end_t=23, strength=0.55),  # Q4 2026 -> Q4 2031
+            MoratoriumSpec("NOVA", start_t=2, end_t=22, strength=0.85),        # Q3 2026 -> Q3 2031
+        ],
+    ),
+
+    "adt_10yr": Scenario(
+        name="ADT 10-Year",
+        description=(
+            "All Democratic Trifectas with 10-year moratorium durations. "
+            "Upper-bound scenario: moratoriums become semi-permanent policy. "
+            "Same states and strengths as ADT; all moratoria run ~Q3 2026 -> Q3 2036."
+        ),
+        moratoria=[
+            MoratoriumSpec("NYC_NJ", start_t=2, end_t=42, strength=1.0),      # Q3 2026 -> Q3 2036
+            MoratoriumSpec("CHI", start_t=3, end_t=43, strength=1.0),          # Q4 2026 -> Q4 2036
+            MoratoriumSpec("WEST_COAST", start_t=3, end_t=43, strength=0.85),  # Q4 2026 -> Q4 2036
+            MoratoriumSpec("OTHER_BLUE", start_t=3, end_t=43, strength=0.55),  # Q4 2026 -> Q4 2036
+            MoratoriumSpec("NOVA", start_t=2, end_t=42, strength=0.85),        # Q3 2026 -> Q3 2036
         ],
     ),
 }

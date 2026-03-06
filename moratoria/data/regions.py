@@ -5,9 +5,43 @@ US capacity figures from JLL/CBRE North America Data Center Reports (H2 2025).
 Grid speed scores derived from PJM/ERCOT/CAISO public interconnection queue data.
 Fiber density from Lightyear/DatacenterHawk market analyses.
 Cost scores from Cushman & Wakefield DC Development Cost Guide 2025.
-Compute quality reflects fiber density, IX proximity, and interconnect quality
-for AI training workloads (fixed at 2025-2026 levels per Critique 7).
 International capacity from Structure Research / Arizton / CBRE reports (2025).
+
+compute_quality scores (0-1): effective compute per MW for AI training workloads,
+reflecting the quality of the local interconnect and networking ecosystem. These
+scores are FIXED at 2025-2026 levels and do not evolve over the simulation. In
+reality, infrastructure matures as investment arrives. The quality degradation
+penalty reported by the model should be interpreted as an upper bound.
+
+Score derivation (all scores are author estimates, not measured):
+  1.00  NOVA    - Ashburn IX is the world's densest interconnection point.
+                  Equinix DC1-DC15, CoreSite, QTS all co-located. Sub-ms
+                  cross-connect latencies. Deepest dark fiber market globally.
+  0.95  NYC_NJ  - 60 Hudson St and 111 8th Ave are top-5 global IX facilities.
+                  Carrier hotel ecosystem. Manhattan fiber ring.
+  0.88  WEST    - Mix of strong (Quincy WA fiber hub, SV campuses) and moderate
+                  (Portland, Sacramento). Google/Microsoft campus fiber.
+  0.85  CHI     - 350 E Cermak is the largest US carrier hotel outside NOVA/NYC.
+                  Strong Midwest IX hub. CenturyLink/Lumen fiber node.
+  0.80  DFW     - Infomart Dallas is a growing IX hub. CyrusOne/QTS campuses.
+                  Not yet at NOVA/NYC density but improving rapidly.
+  0.80  CAN     - Montreal (Cologix) and Toronto IXes have good cross-border
+                  fiber to US Northeast. Comparable to secondary US markets.
+  0.75  ATL     - 56 Marietta St is the primary Southeast IX. Decent but
+                  thinner than DFW/CHI. More enterprise than hyperscale.
+  0.72  PHX     - Developing IX ecosystem (EdgeConneX, CyrusOne). Fiber to LA.
+                  Still thin relative to established markets.
+  0.70  OTH_BLUE - Mixed bag: MA/CT have reasonable fiber (Markley Boston),
+                   but CO/MN/WI are sparse. Weighted average.
+  0.55  TX_OTH  - Houston has some fiber; West TX and San Antonio are sparse.
+                  Renewables-driven sites often lack IX proximity.
+  0.55  OTH_RED - Remote locations (UT, NV, ID) offset decent ones (SC, TN).
+                  Many are greenfield builds with minimal existing fiber.
+  0.55  MEX     - Queretaro improving but still nascent IX. Limited subsea cable
+                  access. CDMX better but not at US secondary market levels.
+  0.45  P_GULF  - Limited fiber (Jeddah/Fujairah subsea hubs are growing).
+                  US export controls limit advanced GPU access (NVIDIA A100/H100
+                  restricted). Score reflects both connectivity AND GPU limits.
 """
 
 from moratoria.config import RegionParams

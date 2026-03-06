@@ -79,7 +79,7 @@ class CapacityModel:
         if national_pipeline > 0:
             actual_share = self.pipeline_by_region[region] / national_pipeline
             historical = max(self.historical_shares.get(region, 0.05), 0.02)
-            excess_concentration = max(0, actual_share / historical - 1.5)
+            excess_concentration = max(0, actual_share / historical - 1.0)
             labor_congestion = LABOR_CONGESTION_SENSITIVITY * excess_concentration
         else:
             labor_congestion = 0

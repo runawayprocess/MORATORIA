@@ -47,6 +47,7 @@ PARAM_NAMES = [
     "hardware_improvement_qtr",
     "agglomeration_elasticity",
     "logit_temperature",
+    "fungibility_price_response",
 ]
 
 PARAM_BOUNDS = [
@@ -58,6 +59,7 @@ PARAM_BOUNDS = [
     [0.06, 0.12],    # hardware_improvement_qtr
     [0.20, 0.70],    # agglomeration_elasticity
     [0.08, 0.25],    # logit_temperature
+    [0.00, 1.00],    # fungibility_price_response (0 = static, 1 = strong price response)
 ]
 
 PARAM_LABELS = {
@@ -69,6 +71,7 @@ PARAM_LABELS = {
     "hardware_improvement_qtr": "HW Improvement/Qtr",
     "agglomeration_elasticity": "Agglom. Elasticity",
     "logit_temperature": "Logit Temperature",
+    "fungibility_price_response": "Fung. Price Resp.",
 }
 
 
@@ -106,6 +109,7 @@ def _patch_and_run(params: dict) -> dict:
         "disp_fungibility": disp_mod.EFFECTIVE_FUNGIBILITY,
         "disp_temperature": disp_mod.LOGIT_TEMPERATURE,
         "disp_agglom_elast": disp_mod.AGGLOMERATION_ELASTICITY,
+        "disp_fung_price": disp_mod.FUNGIBILITY_PRICE_RESPONSE,
         "cap_congestion": cap_mod.CONGESTION_SENSITIVITY,
         "comp_hw_improve": comp_mod.HARDWARE_IMPROVEMENT_QTR,
         "comp_algo_doubling": comp_mod.ALGO_DOUBLING_TIME_MONTHS,
@@ -116,6 +120,7 @@ def _patch_and_run(params: dict) -> dict:
         disp_mod.EFFECTIVE_FUNGIBILITY = params["effective_fungibility"]
         disp_mod.LOGIT_TEMPERATURE = params["logit_temperature"]
         disp_mod.AGGLOMERATION_ELASTICITY = params["agglomeration_elasticity"]
+        disp_mod.FUNGIBILITY_PRICE_RESPONSE = params["fungibility_price_response"]
         cap_mod.CONGESTION_SENSITIVITY = params["congestion_sensitivity"]
         comp_mod.HARDWARE_IMPROVEMENT_QTR = params["hardware_improvement_qtr"]
         comp_mod.ALGO_DOUBLING_TIME_MONTHS = params["algo_doubling_months"]
@@ -151,6 +156,7 @@ def _patch_and_run(params: dict) -> dict:
         disp_mod.EFFECTIVE_FUNGIBILITY = originals["disp_fungibility"]
         disp_mod.LOGIT_TEMPERATURE = originals["disp_temperature"]
         disp_mod.AGGLOMERATION_ELASTICITY = originals["disp_agglom_elast"]
+        disp_mod.FUNGIBILITY_PRICE_RESPONSE = originals["disp_fung_price"]
         cap_mod.CONGESTION_SENSITIVITY = originals["cap_congestion"]
         comp_mod.HARDWARE_IMPROVEMENT_QTR = originals["comp_hw_improve"]
         comp_mod.ALGO_DOUBLING_TIME_MONTHS = originals["comp_algo_doubling"]

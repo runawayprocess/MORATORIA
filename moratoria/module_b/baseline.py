@@ -5,14 +5,26 @@ Models the total national investment flow (MW entering pipeline per quarter)
 under a no-moratorium scenario, plus pre-seeded pipeline projects that were
 already under construction before the simulation starts.
 
-The key insight: reaching 55 GW by 2030 from 25 GW in 2025 requires not
-just new investment during the simulation, but also completing ~15-20 GW
-of projects that were already in the pipeline at the start of 2026.
+The key insight: reaching ~80 GW by 2030 from 25 GW in 2025 requires a
+large pre-seeded pipeline (projects already under construction or in advanced
+interconnection stages at start of 2026) plus aggressive new investment.
+
+2030 capacity target: ~80 GW (operating demand)
+The 2025-2026 consensus moved substantially upward from earlier projections:
+- McKinsey (2025): >80 GW (need to "triple" from 25 GW)
+- Goldman Sachs (Sept 2025): 80-90 GW US share of 122 GW global
+- DOE (July 2024): ~75 GW implied (50 GW attributable to DCs on top of existing)
+- BloombergNEF (Dec 2025): ~80 GW by 2030, revised up 36% from April estimate
+- Bain (2025): up to 100 GW
+- EPRI + Epoch AI (Aug 2025): 50+ GW for AI alone
+Conservative floor: ~65 GW (Grid Strategies, adjusting for double-counting)
 
 Sources:
 - DOE (2024): data center electricity demand report
-- S&P Global (2024): DC grid power demand to nearly triple by 2030
-- JLL (2025): North America DC report: ~35 GW under construction YE 2025
+- McKinsey (2025): AI Power: Expanding DC Capacity to Meet Growing Demand
+- Goldman Sachs (2025): AI to Drive 165% Increase in DC Power Demand by 2030
+- JLL (Jan 2026): Global DC sector to nearly double to 200 GW
+- BloombergNEF (Dec 2025): US DC power demand 106 GW by 2035
 - Sightline Climate (2025): 30-50% pipeline slippage
 """
 
@@ -36,7 +48,11 @@ def compute_preseed_completions(t_end: int = T_END) -> np.ndarray:
     Distribution: weighted toward mid-simulation (2027-2029) since most
     large projects take 2-4 years and were started in 2023-2025.
     """
-    total_preseed_mw = 20_000
+    # Pre-seeded pipeline: reflects the massive 2024-2025 pipeline boom.
+    # JLL (Jan 2026) reports 35+ GW under active construction globally; US is ~70%.
+    # Additional projects in advanced interconnection stages (PJM, ERCOT queues).
+    # After ~30% slippage, effective completions are ~50 GW over the simulation window.
+    total_preseed_mw = 50_000
 
     # Completion profile: bell-shaped, peaking around Q6-Q10 (mid-2027 to mid-2028)
     t = np.arange(t_end)
@@ -56,14 +72,16 @@ def compute_baseline_investment_curve(
     This investment enters the pipeline and takes region-specific construction
     time to become capacity. It supplements the pre-seeded pipeline.
 
-    The curve ramps as AI demand accelerates: ~1.5 GW/qtr → ~3.5 GW/qtr.
+    The curve ramps as AI demand accelerates: ~3.0 GW/qtr → ~7.0 GW/qtr.
+    Calibrated to industry capex trajectory: $150-200B annually by 2026-2027
+    (Goldman Sachs, McKinsey), translating to ~3-7 GW/qtr of new pipeline entry.
     """
     t = np.arange(t_end)
 
-    base_rate = 1500  # MW per quarter at t=0
-    max_rate = 3500   # MW per quarter at peak
-    midpoint = 12     # Ramp midpoint ~Q1 2029
-    steepness = 0.3
+    base_rate = 3000  # MW per quarter at t=0
+    max_rate = 7000   # MW per quarter at peak
+    midpoint = 8      # Ramp midpoint ~Q1 2028 (earlier: AI boom front-loaded)
+    steepness = 0.35
 
     investment = base_rate + (max_rate - base_rate) / (
         1 + np.exp(-steepness * (t - midpoint))

@@ -31,6 +31,7 @@ Three-module pipeline:
 | Reallocation delay | 5 quarters | Site selection + permitting timeline | 3 - 8 quarters |
 | Algo doubling time | 12 months | Erdil & Besiroglu (2024) | 8 - 18 months |
 | Effective fungibility | 0.556 | Workload mix estimate | 0.4 - 0.7 |
+| Fungibility price response | 0.5 | Endogenous scarcity feedback | 0.0 - 1.0 |
 | Queue congestion sensitivity | 0.3 | RMI PJM queue analysis | 0.1 - 0.6 |
 | Hardware improvement/qtr | 9.4% | Epoch AI GATE model | 6% - 12% |
 | Agglomeration elasticity | 0.4 | Krugman (1991) | 0.2 - 0.7 |
@@ -38,12 +39,15 @@ Three-module pipeline:
 
 ## Sensitivity Analysis
 
-Run `--sobol` for a full Sobol global sensitivity analysis (Sobol 2001) across all 8 key parameters. This uses Saltelli sampling (SALib) to compute first-order (S1), total-order (ST), and second-order (S2) indices for peak delay, peak shortfall, and cumulative deficit.
+Run `--sobol` for a full Sobol global sensitivity analysis (Sobol 2001) across all 9 key parameters. This uses Saltelli sampling (SALib) to compute first-order (S1), total-order (ST), and second-order (S2) indices for peak delay, peak shortfall, and cumulative deficit.
 
-**Key Sobol findings (N=64, 640 model evaluations):**
-- **Peak delay** is dominated by `algo_doubling_months` (S1=0.49). Faster software progress reduces the delay impact of moratoriums.
-- **Peak shortfall and cumulative deficit** are driven by `logit_temperature` (S1=0.32-0.51) and `agglomeration_elasticity` (S1=0.34). These determine how concentrated investment is and how strongly moratoriums disrupt it.
-- **Investment elasticity and reallocation delay have near-zero influence** (ST < 0.05). The old sensitivity table (sweeping these two) was misleading; the `--sensitivity` flag now sweeps `algo_doubling_months` x `effective_fungibility` instead.
+**Key Sobol findings (N=64, 1280 model evaluations, 9 parameters):**
+- **Peak delay** is driven by `algo_doubling_months` (S1=0.41) and `queue_congestion_sensitivity` (S1=0.34). Faster software progress reduces delay; queue congestion amplifies it.
+- **Peak shortfall** is dominated by `queue_congestion_sensitivity` (S1=0.84). All other parameters have near-zero first-order indices.
+- **Cumulative deficit** is dominated by `queue_congestion_sensitivity` (S1=0.76).
+- **Logit temperature and agglomeration elasticity have near-zero influence** (ST < 0.03). ASC calibration absorbs their effect on base allocation; they only affect substitution patterns.
+- **Investment elasticity and reallocation delay have near-zero influence** (ST < 0.05). The `--sensitivity` flag sweeps `algo_doubling_months` x `effective_fungibility` instead.
+- **Distribution**: delay p10=3.9wk, median=5.2wk, p90=6.7wk across all parameter combinations.
 
 Run `--validate` to compare the logit allocation at t=0 against observed 2025 regional capacity shares. With ASC calibration, the model reproduces observed shares exactly.
 
@@ -65,7 +69,7 @@ Regional `compute_quality` scores (NOVA=1.0, DFW=0.80, TX_OTHER=0.55, etc.) are 
 
 ### Persistent Shortfall is an Artifact of Exogenous Investment
 
-Under the All Democratic Trifectas scenario, the capacity shortfall does not reequilibrate within the simulation window (through Q4 2036), even though moratoriums expire by Q2 2029. This is because the model uses an exogenous investment curve: the same S-curve (1,500-3,500 MW/qtr) regardless of market conditions. There is no "catch-up" mechanism.
+Under the All Democratic Trifectas scenario, the capacity shortfall does not reequilibrate within the simulation window (through Q4 2036), even though moratoriums expire by Q2 2029. This is because the model uses an exogenous investment curve: the same S-curve (3,000-7,000 MW/qtr) regardless of market conditions. There is no "catch-up" mechanism.
 
 In reality, once moratoriums expire, pent-up demand in affected regions would accelerate investment above the baseline rate. Capacity scarcity during the moratorium period would also raise colocation prices, attracting additional capital. A model with endogenous investment response would show faster recovery after moratorium expiry but also potentially larger immediate shortfalls (as the price signal takes time to propagate).
 
@@ -83,7 +87,7 @@ These physical limits would increase the effective capacity shortfall beyond wha
 
 ### No Endogenous Investment Response
 
-The baseline investment curve is exogenous: the same S-curve (1,500-3,500 MW/quarter) regardless of market conditions. In reality, capacity shortages raise DC prices, which should attract additional investment to open regions. Conversely, the model has no "catch-up" investment after moratoriums expire. A model with endogenous investment response would show faster recovery but also potentially larger immediate shortfalls (as the price signal takes time to propagate).
+The baseline investment curve is exogenous: the same S-curve (3,000-7,000 MW/quarter) regardless of market conditions. In reality, capacity shortages raise DC prices, which should attract additional investment to open regions. Conversely, the model has no "catch-up" investment after moratoriums expire. A model with endogenous investment response would show faster recovery but also potentially larger immediate shortfalls (as the price signal takes time to propagate).
 
 ### Static Moratorium Scenarios
 

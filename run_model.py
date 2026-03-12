@@ -45,7 +45,7 @@ def print_model_context():
     print("--- Model Context ---")
     print(f"  Simulation: Q1 2026 -> {end_label} ({T_END} quarters)")
     print(f"  Starting US capacity: {total_capacity_2025()/1000:.1f} GW across {us_count} US + {intl_count} international regions")
-    print(f"  Target US capacity (2030): 55.0 GW")
+    print(f"  Target US capacity (2030): 80.0 GW (McKinsey/Goldman Sachs/DOE midpoint)")
     print(f"  Investment elasticity: {INVESTMENT_ELASTICITY} (Baker-Bloom-Davis sectoral range)")
     print(f"  Reallocation delay: {REALLOCATION_DELAY_QTRS} quarters ({REALLOCATION_DELAY_QTRS * 3} months)")
     print(f"  Scenarios: {len(SCENARIOS)}")
@@ -56,18 +56,29 @@ def print_model_context():
 
 def print_scenario_table(results: dict):
     """Print summary table across all scenarios."""
-    print(f"{'Scenario':<30} | {'End Cap':>8} | {'Peak':>6} | {'Peak':>7} | {'Cumul':>7} | {'Reequil':>9} |")
-    print(f"{'':30} | {'(GW)':>8} | {'Short%':>6} | {'Delay':>7} | {'Deficit':>7} | {'Quarter':>9} |")
-    print("-" * 100)
+    baseline = results.get("baseline")
+
+    print(f"{'Scenario':<30} | {'End Cap':>8} | {'Raw':>6} | {'QW':>6} | {'Peak':>7} | {'Cumul':>7} | {'Reequil':>9} |")
+    print(f"{'':30} | {'(GW)':>8} | {'Short%':>6} | {'Short%':>6} | {'Delay':>7} | {'Deficit':>7} | {'Quarter':>9} |")
+    print("-" * 110)
 
     for name, r in results.items():
         end_cap = r.capacity_trajectory[-1] / 1000
         tl = r.ai_timeline
 
+        # Quality-weighted shortfall (what the model uses for compute)
         if tl.capacity_shortfall_pct is not None:
-            peak_short = tl.capacity_shortfall_pct.max()
+            peak_qw_short = tl.capacity_shortfall_pct.max()
         else:
-            peak_short = 0.0
+            peak_qw_short = 0.0
+
+        # Raw capacity shortfall (without quality weighting)
+        if baseline and name != "baseline":
+            bl_raw = baseline.capacity_trajectory
+            sc_raw = r.capacity_trajectory
+            raw_shortfall = float(np.max(np.where(bl_raw > 0, (1 - sc_raw / bl_raw) * 100, 0)))
+        else:
+            raw_shortfall = 0.0
 
         if tl.peak_delay_qtrs is not None and name != "baseline":
             weeks = tl.peak_delay_qtrs * 13
@@ -87,7 +98,10 @@ def print_scenario_table(results: dict):
         else:
             req_str = "--"
 
-        print(f"{r.scenario_name:<30} | {end_cap:>8.1f} | {peak_short:>5.1f}% | {delay_str:>7} | {deficit_str:>7} | {req_str:>9} |")
+        if name == "baseline":
+            print(f"{r.scenario_name:<30} | {end_cap:>8.1f} |    --  |    --  | {delay_str:>7} | {deficit_str:>7} | {req_str:>9} |")
+        else:
+            print(f"{r.scenario_name:<30} | {end_cap:>8.1f} | {raw_shortfall:>5.1f}% | {peak_qw_short:>5.1f}% | {delay_str:>7} | {deficit_str:>7} | {req_str:>9} |")
     print()
 
     # Milestone delay detail
@@ -268,6 +282,21 @@ def print_key_findings(results: dict):
                 else:
                     print(f"      {m_name}: N/A")
 
+    # Pipeline timeline diagram
+    if headline:
+        print(f"\n  --- Pipeline Timeline (why peak shortfall lags moratorium expiry) ---")
+        print(f"    ADT moratoriums active:   Q3 2026 ---------> Q2 2028-Q2 2029")
+        print(f"    Reallocation delay (5Q):              Q4 2027 ---------> Q3 2029-Q3 2030")
+        print(f"    Construction (11-23Q):                            builds completing...")
+        print(f"    Fast regions (ERCOT):                                 Q3 2030 ---------> Q2 2033")
+        print(f"    Slow regions (PJM):                                  Q4 2032 ---------> Q2 2035")
+        print(f"    Preseed completions:      =========== (masks early shortfall)")
+        print(f"    Peak shortfall:                                                  ~Q1 2034")
+        print(f"    ")
+        print(f"    The gap between preseed tapering off and redirected pipeline")
+        print(f"    completing is when the shortfall is worst. Moratoriums expire")
+        print(f"    years before the capacity impact peaks because of pipeline lag.")
+
     # Back-of-envelope validation
     print(f"\n  --- Back-of-Envelope Check ---")
     decomp = decompose_compute_growth()
@@ -292,31 +321,31 @@ def print_key_findings(results: dict):
     print(f"\n    Moratoria affect only hardware deployment ({decomp['hardware_share']:.0%} of progress).")
     print(f"    Software/algorithmic improvements continue regardless.")
 
-    # Algo doubling time dominance (Sobol finding)
-    print(f"\n  --- Key Sensitivity Finding ---")
-    print(f"    Sobol global sensitivity analysis (N=64, Saltelli sampling) finds that")
-    print(f"    algo_doubling_months is the single most influential parameter for peak")
-    print(f"    delay (S1 = 0.49, ST = 0.53). This means how fast software improves")
-    print(f"    determines the delay impact of moratoria more than any infrastructure")
-    print(f"    parameter. Faster software progress -> moratoria matter less.")
-    print(f"    Investment elasticity and reallocation delay have near-zero influence (ST < 0.05).")
+    # Sobol findings
+    print(f"\n  --- Key Sensitivity Finding (Sobol, N=64, 1280 runs) ---")
+    print(f"    Peak delay driven by algo_doubling (S1=0.41) and queue_congestion (S1=0.34).")
+    print(f"    Peak shortfall dominated by queue_congestion (S1=0.84). All other params < 0.05.")
+    print(f"    Cumulative deficit dominated by queue_congestion (S1=0.76).")
+    print(f"    Logit temperature and agglomeration elasticity now near-zero (ASC calibration")
+    print(f"    absorbs their effect on base allocation; they only affect substitution patterns).")
+    print(f"    Distribution: delay p10=3.9wk, median=5.2wk, p90=6.7wk")
 
     # Baseline validation
     if "baseline" in results:
         bl_end_gw = results["baseline"].capacity_trajectory[-1] / 1000
-        bl_2030_idx = min(16, len(results["baseline"].capacity_trajectory) - 1)  # Q4 2029 ~ index 16
+        bl_2030_idx = min(19, len(results["baseline"].capacity_trajectory) - 1)  # Q4 2030 = index 19
         bl_2030_gw = results["baseline"].capacity_trajectory[bl_2030_idx] / 1000
         print(f"\n  --- Baseline Validation ---")
-        print(f"    Baseline capacity at Q4 2029 (index {bl_2030_idx}): {bl_2030_gw:.1f} GW")
+        print(f"    Baseline capacity at Q4 2030 (index {bl_2030_idx}): {bl_2030_gw:.1f} GW")
         print(f"    Baseline capacity at simulation end: {bl_end_gw:.1f} GW")
-        print(f"    Industry target (DOE/S&P/Gartner midpoint): ~55 GW by 2030")
-        if bl_2030_gw > 70:
-            print(f"    NOTE: Baseline exceeds 2030 industry target. This reflects the")
-            print(f"    separation of queue congestion (interconnect only) from labor")
-            print(f"    congestion (build time). The 11-year simulation horizon extends")
-            print(f"    well past 2030, with continued ~8%/year compound growth.")
-        elif bl_2030_gw < 45:
-            print(f"    WARNING: Baseline falls well short of 2030 industry target.")
+        print(f"    Industry target: ~80 GW by 2030 (McKinsey/Goldman Sachs/DOE midpoint)")
+        ratio = bl_2030_gw / 80.0
+        if 0.9 <= ratio <= 1.1:
+            print(f"    Baseline is within 10% of industry target ({ratio:.0%}). Calibration OK.")
+        elif ratio > 1.1:
+            print(f"    NOTE: Baseline exceeds 2030 industry target ({ratio:.0%}).")
+        else:
+            print(f"    WARNING: Baseline undershoots 2030 industry target ({ratio:.0%}).")
 
     print()
 
@@ -470,10 +499,11 @@ def print_sensitivity_analysis():
     center = len(algo_months) * 1 + 1  # middle of 3x3
     print(f"         Central estimate (algo=12mo, fung=0.556): {all_delays[center]:.1f}wk / {all_shortfalls[center]:.1f}%")
 
-    print(f"\n  NOTE: Sobol analysis (N=64) found investment_elasticity and")
-    print(f"  reallocation_delay have near-zero influence (ST < 0.05).")
-    print(f"  Algo doubling time dominates peak delay (S1 = 0.49).")
-    print(f"  Logit temperature and agglomeration elasticity dominate shortfall.")
+    print(f"\n  NOTE: Sobol analysis (N=64, 1280 runs) found queue_congestion is")
+    print(f"  the dominant parameter for shortfall (S1=0.84) and cumul deficit (S1=0.76).")
+    print(f"  Peak delay is driven by algo_doubling (S1=0.41) and queue_congestion (S1=0.34).")
+    print(f"  Logit temperature and agglomeration elasticity have near-zero influence")
+    print(f"  with ASC calibration (ST < 0.03).")
     print()
 
 

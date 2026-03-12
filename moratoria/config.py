@@ -123,7 +123,7 @@ FUNGIBILITY_PRICE_RESPONSE = 0.5
 # ---------------------------------------------------------------------------
 
 CAPACITY_2025_US_MW = 25_000
-CAPACITY_2030_TARGET_MW = 55_000
+CAPACITY_2030_TARGET_MW = 80_000  # McKinsey/Goldman Sachs/DOE-implied midpoint (2025-2026 consensus)
 DEPRECIATION_RATE_QTR = 0.01        # ~4% annual (25-year facility lifecycle)
 BASELINE_SLIPPAGE_RATE = 0.35
 

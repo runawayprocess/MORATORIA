@@ -16,7 +16,7 @@ import numpy as np
 from dataclasses import dataclass, field
 from typing import Optional
 
-from moratoria.config import T_END, INTL_ORGANIC_GROWTH_QTR, INVESTMENT_ELASTICITY, REALLOCATION_DELAY_QTRS, quarter_label
+from moratoria.config import T_END, INVESTMENT_ELASTICITY, REALLOCATION_DELAY_QTRS, quarter_label
 from moratoria.data.regions import REGIONS
 from moratoria.data.scenarios import Scenario, SCENARIOS
 from moratoria.module_a.displacement import DisplacementModel
@@ -90,15 +90,6 @@ def run_scenario(
 
         # Module B: Process completions and depreciation
         b_result = capacity_model.step(t, preseed_completions=preseed)
-
-        # International organic growth
-        for region in REGIONS:
-            if REGIONS[region].is_international:
-                organic = capacity_model.capacity[region] * INTL_ORGANIC_GROWTH_QTR
-                capacity_model.capacity[region] += organic
-                b_result["capacity"][region] = capacity_model.capacity[region]
-                b_result["capacity_changes"][region] += organic
-        b_result["total_capacity"] = sum(b_result["capacity"].values())
 
         # Record trajectories
         capacity_ts[t] = b_result["total_capacity"]

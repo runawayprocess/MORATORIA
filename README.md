@@ -93,6 +93,6 @@ Scenarios are fixed at enactment. No modeling of:
 - Political feedback (moratoriums causing job losses get repealed faster)
 - Strategic firm behavior (lobbying, pre-committing investment)
 
-### International Leakage Treated as Capacity
+### International Leakage Not Modeled
 
-Investment redirected to Persian Gulf, Canada, and Mexico is counted as global capacity. From a US policy perspective, this capacity operates outside US regulatory jurisdiction, export control frameworks, and data sovereignty protections. The model's "delay" metric measures global AI capabilities delay, not delay to US-controlled AI capabilities.
+International regions (Persian Gulf, Canada, Mexico) are included as reference capacity but do not receive redirected US investment. Blocked investment is redistributed only among domestic US regions. In reality, some investment would leak abroad, but the magnitude depends on export controls, data sovereignty requirements, construction labor availability in destination countries, and corporate governance timelines that are difficult to parameterize credibly. The model's delay metrics reflect US-only displacement.

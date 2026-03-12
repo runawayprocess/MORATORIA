@@ -229,11 +229,15 @@ class DisplacementModel:
 
         relocatable_mw = total_blocked * adjusted_fungibility
 
-        # Redirect destinations (all non-blocked regions compete via logit)
+        # Redirect destinations (domestic non-blocked regions only)
+        # International regions do not receive redirected US investment.
         arrival_t = t + self.reallocation_delay
         scores = self.compute_scores(t)
         redirect_scores = {}
         for region in self.region_names:
+            if self.regions[region].is_international:
+                redirect_scores[region] = 0.0
+                continue
             strength = self.get_moratorium_strength(region, t, scenario)
             if strength < 1.0:
                 redirect_scores[region] = scores[region] * (1.0 - strength)
@@ -249,11 +253,6 @@ class DisplacementModel:
             redirect_shares = {r: v / total_exp for r, v in exp_s.items()} if total_exp > 0 else {r: 0.0 for r in self.region_names}
         else:
             redirect_shares = {r: 0.0 for r in self.region_names}
-
-        to_international = sum(
-            relocatable_mw * redirect_shares[r]
-            for r in self.region_names if self.regions[r].is_international
-        )
 
         # Add to reallocation buffer (delayed)
         for region, share in redirect_shares.items():
@@ -272,7 +271,6 @@ class DisplacementModel:
         return {
             "allocation": allocation,
             "blocked": blocked,
-            "to_international": to_international,
         }
 
     def update_state(

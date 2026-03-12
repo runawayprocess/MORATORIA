@@ -283,25 +283,6 @@ def print_key_findings(results: dict):
             print(f"    Model delay: {headline.ai_timeline.peak_delay_qtrs:.2f} quarters")
             print(f"    Match confirms model arithmetic is sound; geographic model drives the shortfall %.")
 
-    # International leakage
-    if headline and headline.capacity_by_region:
-        intl = international_regions()
-        intl_end_bl = sum(results["baseline"].capacity_by_region[r][-1] for r in intl)
-        intl_end_sc = sum(headline.capacity_by_region[r][-1] for r in intl)
-        leakage_gw = (intl_end_sc - intl_end_bl) / 1000
-        if leakage_gw > 0:
-            # Find Gulf specifically
-            gulf_end_bl = results["baseline"].capacity_by_region.get("PERSIAN_GULF", np.zeros(1))[-1]
-            gulf_end_sc = headline.capacity_by_region.get("PERSIAN_GULF", np.zeros(1))[-1]
-            gulf_leakage_gw = (gulf_end_sc - gulf_end_bl) / 1000
-            print(f"\n  --- International Leakage ---")
-            print(f"    Additional international capacity vs. baseline: {leakage_gw:.1f} GW")
-            print(f"      of which Persian Gulf (UAE/Saudi/Qatar): {gulf_leakage_gw:.1f} GW")
-            print(f"    This capacity operates outside US regulatory jurisdiction,")
-            print(f"    export control frameworks, and data sovereignty protections.")
-            print(f"    From a governance perspective, moratoriums do not slow AI")
-            print(f"    development globally; they shift where it happens.")
-
     # Compute decomposition
     print(f"\n  --- Software vs. Hardware Decomposition ---")
     print(f"    Hardware efficiency growth: {decomp['hardware_growth_annual']:.0%}/year")

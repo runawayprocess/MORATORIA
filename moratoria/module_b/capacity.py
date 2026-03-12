@@ -26,6 +26,21 @@ from moratoria.data.regions import REGIONS, RegionParams
 # Queue congestion: 30% pipeline-to-capacity increase -> 30% longer interconnection
 CONGESTION_SENSITIVITY = 0.3
 
+# Queue congestion threshold: the pipeline-to-capacity ratio at which
+# interconnection delays begin extending. Below this ratio, the interconnection
+# system can absorb new projects at the base rate. Above it, queue congestion
+# kicks in proportionally.
+#
+# Range: 0.08-0.30 (swept in Sobol analysis)
+#   0.08 = very tight: even modest pipeline causes congestion (aggressive)
+#   0.15 = moderate: congestion fires when pipeline exceeds ~15% of capacity (default)
+#   0.30 = loose: region can absorb large pipeline before congestion appears
+#
+# At 0.15, DFW (3,500 MW) hits congestion when pipeline exceeds 525 MW.
+# At 0.30, threshold rises to 1,050 MW. The parameter interacts strongly
+# with CONGESTION_SENSITIVITY.
+CONGESTION_THRESHOLD = 0.15
+
 # Labor/equipment congestion: when a region's share of national construction
 # pipeline exceeds its historical capacity share, build times extend.
 # 0.15 = 15% longer build time per 100% excess concentration.
@@ -66,7 +81,7 @@ class CapacityModel:
         r = self.regions[region]
 
         # Queue congestion: interconnection times increase with pipeline backlog
-        baseline_pipeline = self.capacity[region] * 0.15
+        baseline_pipeline = self.capacity[region] * CONGESTION_THRESHOLD
         ratio = self.pipeline_by_region[region] / max(baseline_pipeline, 1)
         queue_congestion = CONGESTION_SENSITIVITY * max(0, ratio - 1)
         interconnect_time = r.interconnect_time_qtrs * (1 + queue_congestion)

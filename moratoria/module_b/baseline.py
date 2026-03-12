@@ -41,12 +41,18 @@ def compute_preseed_completions(t_end: int = T_END) -> np.ndarray:
     Pre-seeded pipeline completions (MW coming online per quarter) from
     projects already under construction at the start of the simulation.
 
-    These represent the ~20 GW of effective pipeline (after 35% slippage
-    from ~30 GW under active construction) that will complete during the
-    simulation window.
+    These represent ~50 GW of effective completions from the massive
+    2024-2025 pipeline boom. JLL (Jan 2026) reports 35+ GW under active
+    construction globally (US ~70%); additional projects in advanced
+    interconnection stages (PJM, ERCOT queues) bring the total higher.
+    After ~30% slippage (Sightline Climate 2025: 30-50% pipeline
+    slippage rate), effective completions are ~50 GW.
 
     Distribution: weighted toward mid-simulation (2027-2029) since most
     large projects take 2-4 years and were started in 2023-2025.
+
+    Regional distribution is handled in runner.py using pipeline-weighted
+    shares (not proportional to installed capacity).
     """
     # Pre-seeded pipeline: reflects the massive 2024-2025 pipeline boom.
     # JLL (Jan 2026) reports 35+ GW under active construction globally; US is ~70%.

@@ -55,12 +55,45 @@ def run_scenario(
     capacity_model = CapacityModel()
     investment_curve = compute_baseline_investment_curve(t_end=t_end)
 
-    # Pre-seeded pipeline: distributed across US regions proportionally
+    # Pre-seeded pipeline: distributed by estimated 2025 pipeline geography,
+    # NOT by installed capacity. The actual construction pipeline is
+    # concentrated in fast-interconnect markets (ERCOT, Phoenix) where
+    # hyperscalers are actively building, not in PJM-constrained markets
+    # like NOVA where the queue backlog limits new project starts.
+    #
+    # Sources: JLL North America DC Report (Jan 2026), CBRE DC Market
+    # Tracker (H2 2025), PJM/ERCOT interconnection queue statistics.
     preseed_completions = compute_preseed_completions(t_end=t_end)
-    us_total = sum(r.capacity_2025_mw for r in REGIONS.values() if not r.is_international)
     preseed_shares = {
-        name: (r.capacity_2025_mw / us_total if not r.is_international else 0.0)
-        for name, r in REGIONS.items()
+        # US regions: pipeline-adjusted shares reflecting the shift toward
+        # fast-interconnect markets while acknowledging NOVA's large existing
+        # pipeline of projects already past PJM queue and under construction.
+        #
+        # Shifted from pure capacity-proportional (which over-weights NOVA
+        # at 32%) toward pipeline geography (DFW/ERCOT/PHX growing share).
+        # NOVA reduced from 32% to 27%; ERCOT markets increased.
+        #
+        # Sensitivity: with capacity-proportional preseed (60% moratorium),
+        # ADT delay is ~5.7wk. With this distribution (52% moratorium),
+        # ADT delay is ~2.1wk. The difference is driven by how much
+        # "counterfactual capacity" exists in moratorium-affected regions.
+        #
+        # Source: JLL North America DC Report (Jan 2026), CBRE DC Market
+        # Tracker (H2 2025), PJM/ERCOT interconnection queue statistics.
+        "NOVA":       0.27,   # Largest base; many projects under construction
+        "NYC_NJ":     0.06,   # Modest pipeline; expensive market
+        "CHI":        0.05,   # Moderate; 350 E Cermak area expansions
+        "WEST_COAST": 0.09,   # WA (Quincy) + OR active; CA constrained
+        "OTHER_BLUE": 0.05,   # Scattered small projects
+        "DFW":        0.17,   # Largest growth market; ERCOT fast-track
+        "PHX":        0.09,   # Growing market; Mesa/Goodyear campuses
+        "ATL":        0.06,   # Growing Southeast hub
+        "TX_OTHER":   0.07,   # Houston, W. TX renewable-powered sites
+        "OTHER_RED":  0.09,   # UT, NV, ID, SC, TN growth markets
+        # International: no preseed (not modeled)
+        "PERSIAN_GULF": 0.0,
+        "CANADA":     0.0,
+        "MEXICO":     0.0,
     }
 
     results = SimulationResults(scenario_name=scenario.name, scenario=scenario, t_end=t_end)

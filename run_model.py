@@ -322,13 +322,14 @@ def print_key_findings(results: dict):
     print(f"    Software/algorithmic improvements continue regardless.")
 
     # Sobol findings
-    print(f"\n  --- Key Sensitivity Finding (Sobol, N=64, 1280 runs) ---")
-    print(f"    Peak delay driven by algo_doubling (S1=0.41) and queue_congestion (S1=0.34).")
-    print(f"    Peak shortfall dominated by queue_congestion (S1=0.84). All other params < 0.05.")
-    print(f"    Cumulative deficit dominated by queue_congestion (S1=0.76).")
-    print(f"    Logit temperature and agglomeration elasticity now near-zero (ASC calibration")
-    print(f"    absorbs their effect on base allocation; they only affect substitution patterns).")
-    print(f"    Distribution: delay p10=3.9wk, median=5.2wk, p90=6.7wk")
+    print(f"\n  --- Key Sensitivity Finding (Sobol, N=64, 1408 runs, 10 params) ---")
+    print(f"    Peak delay driven by congestion_threshold (S1=0.80). Algo doubling and")
+    print(f"    congestion_sensitivity are secondary (ST~0.12 each).")
+    print(f"    Peak shortfall dominated by congestion_threshold (S1=0.94).")
+    print(f"    Cumulative deficit more distributed: congestion_threshold (S1=0.38),")
+    print(f"    congestion_sensitivity (ST=0.36), fungibility_price_response (ST=0.25),")
+    print(f"    investment_elasticity (ST=0.15).")
+    print(f"    Distribution: delay p10=1.2wk, median=2.9wk, p90=4.2wk")
 
     # Baseline validation
     if "baseline" in results:
@@ -499,11 +500,12 @@ def print_sensitivity_analysis():
     center = len(algo_months) * 1 + 1  # middle of 3x3
     print(f"         Central estimate (algo=12mo, fung=0.556): {all_delays[center]:.1f}wk / {all_shortfalls[center]:.1f}%")
 
-    print(f"\n  NOTE: Sobol analysis (N=64, 1280 runs) found queue_congestion is")
-    print(f"  the dominant parameter for shortfall (S1=0.84) and cumul deficit (S1=0.76).")
-    print(f"  Peak delay is driven by algo_doubling (S1=0.41) and queue_congestion (S1=0.34).")
+    print(f"\n  NOTE: Sobol analysis (N=64, 1408 runs, 10 params) found congestion_threshold")
+    print(f"  is the dominant parameter for delay (S1=0.80) and shortfall (S1=0.94).")
+    print(f"  Cumulative deficit is more distributed across congestion_threshold (S1=0.38),")
+    print(f"  congestion_sensitivity (ST=0.36), and fungibility_price_response (ST=0.25).")
     print(f"  Logit temperature and agglomeration elasticity have near-zero influence")
-    print(f"  with ASC calibration (ST < 0.03).")
+    print(f"  with ASC calibration (ST < 0.07).")
     print()
 
 

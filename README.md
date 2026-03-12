@@ -32,22 +32,23 @@ Three-module pipeline:
 | Algo doubling time | 12 months | Erdil & Besiroglu (2024) | 8 - 18 months |
 | Effective fungibility | 0.556 | Workload mix estimate | 0.4 - 0.7 |
 | Fungibility price response | 0.5 | Endogenous scarcity feedback | 0.0 - 1.0 |
-| Queue congestion sensitivity | 0.3 | RMI PJM queue analysis | 0.1 - 0.6 |
+| Queue congestion sensitivity | 0.3 | PJM/ERCOT queue data (see note) | 0.1 - 0.6 |
+| Queue congestion threshold | 0.15 | Pipeline-to-capacity onset ratio | 0.08 - 0.30 |
 | Hardware improvement/qtr | 9.4% | Epoch AI GATE model | 6% - 12% |
 | Agglomeration elasticity | 0.4 | Krugman (1991) | 0.2 - 0.7 |
 | Logit temperature | 0.15 | Calibrated to regional distribution | 0.08 - 0.25 |
 
 ## Sensitivity Analysis
 
-Run `--sobol` for a full Sobol global sensitivity analysis (Sobol 2001) across all 9 key parameters. This uses Saltelli sampling (SALib) to compute first-order (S1), total-order (ST), and second-order (S2) indices for peak delay, peak shortfall, and cumulative deficit.
+Run `--sobol` for a full Sobol global sensitivity analysis (Sobol 2001) across all 10 key parameters. This uses Saltelli sampling (SALib) to compute first-order (S1), total-order (ST), and second-order (S2) indices for peak delay, peak shortfall, and cumulative deficit.
 
-**Key Sobol findings (N=64, 1280 model evaluations, 9 parameters):**
-- **Peak delay** is driven by `algo_doubling_months` (S1=0.41) and `queue_congestion_sensitivity` (S1=0.34). Faster software progress reduces delay; queue congestion amplifies it.
-- **Peak shortfall** is dominated by `queue_congestion_sensitivity` (S1=0.84). All other parameters have near-zero first-order indices.
-- **Cumulative deficit** is dominated by `queue_congestion_sensitivity` (S1=0.76).
-- **Logit temperature and agglomeration elasticity have near-zero influence** (ST < 0.03). ASC calibration absorbs their effect on base allocation; they only affect substitution patterns.
-- **Investment elasticity and reallocation delay have near-zero influence** (ST < 0.05). The `--sensitivity` flag sweeps `algo_doubling_months` x `effective_fungibility` instead.
-- **Distribution**: delay p10=3.9wk, median=5.2wk, p90=6.7wk across all parameter combinations.
+**Key Sobol findings (N=64, 1408 model evaluations, 10 parameters):**
+- **Peak delay** is dominated by `congestion_threshold` (S1=0.80), the pipeline-to-capacity ratio at which queue congestion begins. `algo_doubling_months` and `congestion_sensitivity` are secondary (ST~0.12 each).
+- **Peak shortfall** is dominated by `congestion_threshold` (S1=0.94). All other parameters have near-zero first-order indices.
+- **Cumulative deficit** is more distributed: `congestion_threshold` (S1=0.38, ST=0.47), `congestion_sensitivity` (ST=0.36), `fungibility_price_response` (ST=0.25), `investment_elasticity` (ST=0.15).
+- **The two congestion parameters interact** (S2=0.13-0.20): the threshold determines *when* congestion activates, the sensitivity determines *how much* it hurts. Together they drive most model variance.
+- **Logit temperature and agglomeration elasticity have near-zero influence** (ST < 0.07). ASC calibration absorbs their effect on base allocation.
+- **Distribution**: delay p10=1.2wk, median=2.9wk, p90=4.2wk across all parameter combinations.
 
 Run `--validate` to compare the logit allocation at t=0 against observed 2025 regional capacity shares. With ASC calibration, the model reproduces observed shares exactly.
 

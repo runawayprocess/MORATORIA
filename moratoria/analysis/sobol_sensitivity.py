@@ -3,7 +3,7 @@ Sobol global sensitivity analysis for the Moratoria Impact Model.
 
 Performs variance-based decomposition (Sobol 2001) to identify which
 parameters drive the most variance in model outputs. Uses Saltelli
-sampling (SALib) across 8 key parameters, running the full A->B->C
+sampling (SALib) across 10 key parameters, running the full A->B->C
 pipeline for each sample.
 
 Output: first-order indices (S1, direct effect), total-order indices
@@ -44,6 +44,7 @@ PARAM_NAMES = [
     "algo_doubling_months",
     "effective_fungibility",
     "congestion_sensitivity",
+    "congestion_threshold",
     "hardware_improvement_qtr",
     "agglomeration_elasticity",
     "logit_temperature",
@@ -56,6 +57,7 @@ PARAM_BOUNDS = [
     [8.0, 18.0],     # algo_doubling_months
     [0.40, 0.70],    # effective_fungibility
     [0.10, 0.60],    # congestion_sensitivity
+    [0.08, 0.30],    # congestion_threshold (pipeline-to-capacity ratio for queue onset)
     [0.06, 0.12],    # hardware_improvement_qtr
     [0.20, 0.70],    # agglomeration_elasticity
     [0.08, 0.25],    # logit_temperature
@@ -68,6 +70,7 @@ PARAM_LABELS = {
     "algo_doubling_months": "Algo Doubling Time",
     "effective_fungibility": "Fungibility",
     "congestion_sensitivity": "Queue Congestion",
+    "congestion_threshold": "Congest. Threshold",
     "hardware_improvement_qtr": "HW Improvement/Qtr",
     "agglomeration_elasticity": "Agglom. Elasticity",
     "logit_temperature": "Logit Temperature",
@@ -111,6 +114,7 @@ def _patch_and_run(params: dict) -> dict:
         "disp_agglom_elast": disp_mod.AGGLOMERATION_ELASTICITY,
         "disp_fung_price": disp_mod.FUNGIBILITY_PRICE_RESPONSE,
         "cap_congestion": cap_mod.CONGESTION_SENSITIVITY,
+        "cap_threshold": cap_mod.CONGESTION_THRESHOLD,
         "comp_hw_improve": comp_mod.HARDWARE_IMPROVEMENT_QTR,
         "comp_algo_doubling": comp_mod.ALGO_DOUBLING_TIME_MONTHS,
     }
@@ -122,6 +126,7 @@ def _patch_and_run(params: dict) -> dict:
         disp_mod.AGGLOMERATION_ELASTICITY = params["agglomeration_elasticity"]
         disp_mod.FUNGIBILITY_PRICE_RESPONSE = params["fungibility_price_response"]
         cap_mod.CONGESTION_SENSITIVITY = params["congestion_sensitivity"]
+        cap_mod.CONGESTION_THRESHOLD = params["congestion_threshold"]
         comp_mod.HARDWARE_IMPROVEMENT_QTR = params["hardware_improvement_qtr"]
         comp_mod.ALGO_DOUBLING_TIME_MONTHS = params["algo_doubling_months"]
 
@@ -158,6 +163,7 @@ def _patch_and_run(params: dict) -> dict:
         disp_mod.AGGLOMERATION_ELASTICITY = originals["disp_agglom_elast"]
         disp_mod.FUNGIBILITY_PRICE_RESPONSE = originals["disp_fung_price"]
         cap_mod.CONGESTION_SENSITIVITY = originals["cap_congestion"]
+        cap_mod.CONGESTION_THRESHOLD = originals["cap_threshold"]
         comp_mod.HARDWARE_IMPROVEMENT_QTR = originals["comp_hw_improve"]
         comp_mod.ALGO_DOUBLING_TIME_MONTHS = originals["comp_algo_doubling"]
 

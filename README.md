@@ -90,6 +90,16 @@ These physical limits would increase the effective capacity shortfall beyond wha
 
 The baseline investment curve is exogenous: the same S-curve (3,000-7,000 MW/quarter) regardless of market conditions. In reality, capacity shortages raise DC prices, which should attract additional investment to open regions. Conversely, the model has no "catch-up" investment after moratoriums expire. A model with endogenous investment response would show faster recovery but also potentially larger immediate shortfalls (as the price signal takes time to propagate).
 
+### Duration vs. Breadth Inversion in Cumulative Deficit
+
+The Currently Considering scenario (narrower scope: NYC, VT/ME, GA) produces a *higher* cumulative compute deficit than All Democratic Trifectas (broader scope: all Dem trifecta states). This counterintuitive result is driven by three mechanisms:
+
+1. **Moratorium duration**: CC's NYC moratorium is 3 years (to Q3 2029) and OTHER_BLUE runs to Q3 2030. ADT's broadest moratoria are 2-2.5 years (expire Q4 2028). Longer moratoriums create more persistent pipeline disruption.
+2. **Destination blocking**: CC uniquely blocks Atlanta (a red-state destination region), reducing absorption capacity. ADT does not block any destination regions.
+3. **Pipeline speed-up**: ADT redirects investment from slow-pipeline NOVA (PJM, 23-quarter build) to fast-pipeline DFW/TX (ERCOT, 11-quarter build). This briefly causes ADT capacity to *exceed* baseline around Q4 2031, partially offsetting later shortfalls.
+
+The finding is robust to clipping (whether overshoot quarters offset deficit or not). Peak shortfall and peak delay metrics are unaffected and order correctly (ADT > CC). The implication for policy: moratorium *duration* matters more than moratorium *breadth* for cumulative compute impact.
+
 ### Static Moratorium Scenarios
 
 Scenarios are fixed at enactment. No modeling of:

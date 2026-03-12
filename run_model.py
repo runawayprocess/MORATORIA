@@ -321,6 +321,23 @@ def print_key_findings(results: dict):
     print(f"\n    Moratoria affect only hardware deployment ({decomp['hardware_share']:.0%} of progress).")
     print(f"    Software/algorithmic improvements continue regardless.")
 
+    # Duration vs. breadth finding
+    cc = results.get("currently_considering")
+    adt_2yr = results.get("all_dem_trifectas")
+    if cc and adt_2yr and cc.ai_timeline.cumulative_flop_deficit_pct and adt_2yr.ai_timeline.cumulative_flop_deficit_pct:
+        cc_cd = cc.ai_timeline.cumulative_flop_deficit_pct
+        adt_cd = adt_2yr.ai_timeline.cumulative_flop_deficit_pct
+        if cc_cd > adt_cd:
+            print(f"\n  --- Duration vs. Breadth ---")
+            print(f"    Currently Considering cumulative deficit ({cc_cd:.1f}%) > ADT ({adt_cd:.1f}%)")
+            print(f"    despite narrower moratorium scope. Three mechanisms:")
+            print(f"    1. CC moratoriums are longer (NYC 3yr, OTHER_BLUE to 2030 vs ADT ~2yr)")
+            print(f"    2. CC uniquely blocks Atlanta, a red-state destination region")
+            print(f"    3. ADT redirects slow-pipeline (PJM 23Q) to fast-pipeline (ERCOT 11Q),")
+            print(f"       briefly causing MORE capacity than baseline (pipeline speed-up)")
+            print(f"    Implication: moratorium DURATION matters more than BREADTH for")
+            print(f"    cumulative compute impact. Blocking destination regions is costly.")
+
     # Sobol findings
     print(f"\n  --- Key Sensitivity Finding (Sobol, N=64, 1408 runs, 10 params) ---")
     print(f"    Peak delay driven by congestion_threshold (S1=0.80). Algo doubling and")
